@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>血压记录</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <style>
+        :root {
+            --bg: #F5F0E8;
+            --card: #FFFFFF;
+            --text: #1A1A1A;
+            --text-sec: #888;
+            --primary: #2E7D52;
+            --primary-light: #E8F5EC;
+            --danger: #D94F3B;
+            --danger-light: #FDECEB;
+            --orange: #E8923A;
+            --border: #E8E2D8;
+        }
+        *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+        body{
+            font-family:-apple-system,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+            background:linear-gradient(180deg,#EDE8DF 0%,var(--bg) 15%);
+            color:var(--text);font-size:18px;line-height:1.6;
+            min-height:100vh;padding-bottom:40px;
+        }
+        body::before,body::after{content:'';position:fixed;border-radius:50%;pointer-events:none;z-index:0}
+        body::before{top:-80px;right:-60px;width:260px;height:260px;background:radial-gradient(circle,rgba(46,125,82,.07) 0%,transparent 70%)}
+        body::after{bottom:60px;left:-80px;width:200px;height:200px;background:radial-gradient(circle,rgba(232,146,58,.06) 0%,transparent 70%)}
+
+        header{
+            background:linear-gradient(135deg,#2E7D52 0%,#3A9966 100%);
+            color:#fff;padding:22px 20px 26px;text-align:center;
+            position:sticky;top:0;z-index:100;
+            box-shadow:0 2px 16px rgba(46,125,82,.2);
+        }
+        header h1{font-size:28px;font-weight:900;letter-spacing:3px}
+        header p{font-size:14px;opacity:.8;margin-top:2px}
+
+        main{position:relative;z-index:1;padding:16px;max-width:480px;margin:0 auto}
+
+        .stats-card{
+            background:var(--card);border-radius:16px;padding:22px 16px;
+            box-shadow:0 2px 12px rgba(0,0,0,.05);margin-bottom:16px;
+            display:flex;justify-content:space-around;align-items:center;gap:8px;
+        }
+        .stat-item{text-align:center;flex:1}
+        .stat-label{font-size:14px;color:var(--text-sec);margin-bottom:6px;line-height:1.3}
+        .stat-value{font-size:40px;font-weight:900;color:var(--primary);line-height:1.1;transition:color .3s}
+        .stat-unit{font-size:12px;color:var(--text-sec);margin-top:2px}
+        .stat-divider{width:1px;height:56px;background:var(--border);flex-shrink:0}
+
+        .input-card{
+            background:var(--card);border-radius:16px;padding:22px 20px;
+            box-shadow:0 2px 12px rgba(0,0,0,.05);margin-bottom:16px;
+        }
+        .input-card h2,.chart-card h2,.history-card h2{
+            font-size:20px;font-weight:700;margin-bottom:16px;display:flex;align-items:center;gap:8px;
+        }
+        .input-card h2 i{color:var(--primary)}
+        .input-row{display:flex;gap:14px;margin-bottom:18px}
+        .input-group{flex:1}
+        .input-group label{display:block;font-size:15px;color:var(--text-sec);margin-bottom:6px;font-weight:700}
+        .input-group input{
+            width:100%;height:68px;border:2.5px solid var(--border);border-radius:14px;
+            font-size:34px;font-weight:700;text-align:center;color:var(--text);
+            outline:none;transition:border-color .2s,background .2s;background:#FAFAF8;
+        }
+        .input-group input:focus{border-color:var(--primary);background:#fff;box-shadow:0 0 0 3px rgba(46,125,82,.1)}
+        .input-group input::placeholder{color:#CCC;font-size:22px;font-weight:400}
+        input[type="number"]::-webkit-inner-spin-button,
+        input[type="number"]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+        input[type="number"]{-moz-appearance:textfield}
+
+        .btn-record{
+            width:100%;height:62px;
+            background:linear-gradient(135deg,#2E7D52,#3A9966);
+            color:#fff;border:none;border-radius:14px;font-size:24px;font-weight:700;
+            letter-spacing:6px;cursor:pointer;
+            transition:transform .12s,box-shadow .12s;
+            box-shadow:0 4px 14px rgba(46,125,82,.3);
+            display:flex;align-items:center;justify-content:center;gap:10px;
+        }
+        .btn-record:active{transform:scale(.97);box-shadow:0 2px 8px rgba(46,125,82,.2)}
+
+        .alert-high{
+            background:var(--danger-light);border:2.5px solid var(--danger);border-radius:14px;
+            padding:16px 18px;margin-bottom:16px;display:none;align-items:center;gap:12px;
+            font-size:20px;font-weight:700;color:var(--danger);
+        }
+        .alert-high.show{display:flex;animation:alertShake .45s ease}
+        @keyframes alertShake{
+            0%,100%{transform:translateX(0)}15%{transform:translateX(-8px)}
+            30%{transform:translateX(8px)}50%{transform:translateX(-5px)}70%{transform:translateX(5px)}
+        }
+
+        .chart-card{
+            background:var(--card);border-radius:16px;padding:22px 20px;
+            box-shadow:0 2px 12px rgba(0,0,0,.05);margin-bottom:16px;
+        }
+        .chart-card h2 i{color:var(--orange)}
+        .chart-wrap{position:relative;width:100%;height:250px}
+        .chart-empty{text-align:center;padding:50px 0;color:var(--text-sec);font-size:16px}
+        .chart-empty i{display:block;font-size:36px;margin-bottom:12px;opacity:.3}
+
+        .history-card{
+            background:var(--card);border-radius:16px;padding:22px 20px;
+            box-shadow:0 2px 12px rgba(0,0,0,.05);margin-bottom:16px;
+        }
+        .history-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+        .history-header h2{margin-bottom:0}
+        .history-header h2 i{color:var(--primary)}
+        .btn-clear{
+            font-size:14px;color:var(--text-sec);background:none;border:1.5px solid var(--border);
+            border-radius:8px;padding:5px 14px;cursor:pointer;transition:all .15s;
+        }
+        .btn-clear:active{background:var(--danger-light);color:var(--danger);border-color:var(--danger)}
+
+        .history-list{max-height:420px;overflow-y:auto}
+        .history-item{
+            display:flex;align-items:center;padding:14px 0;
+            border-bottom:1px solid #F0ECE4;gap:10px;
+            animation:fadeInUp .25s ease;
+        }
+        .history-item:last-child{border-bottom:none}
+        @keyframes fadeInUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+        .history-time{font-size:13px;color:var(--text-sec);min-width:80px;line-height:1.4}
+        .history-time .hd{font-weight:700;font-size:15px;color:var(--text)}
+        .history-bp{font-size:26px;font-weight:900;flex:1;line-height:1}
+        .history-bp .sep{font-size:18px;color:var(--text-sec);margin:0 1px}
+        .history-bp.high{color:var(--danger)}
+        .history-bp .unit{font-size:11px;font-weight:400;color:var(--text-sec);margin-left:3px}
+
+        .history-tag{
+            font-size:13px;font-weight:700;padding:4px 10px;
+            border-radius:8px;white-space:nowrap;flex-shrink:0;
+        }
+        .history-tag.high{background:var(--danger-light);color:var(--danger)}
+        .history-tag.normal{background:var(--primary-light);color:var(--primary)}
+
+        .btn-del{
+            width:38px;height:38px;border:none;background:none;color:#CCC;font-size:15px;
+            cursor:pointer;border-radius:10px;display:flex;align-items:center;justify-content:center;
+            flex-shrink:0;transition:all .15s;
+        }
+        .btn-del:active{background:var(--danger-light);color:var(--danger)}
+
+        .history-empty{text-align:center;padding:36px 0;color:var(--text-sec);font-size:16px}
+        .history-empty i{display:block;font-size:32px;margin-bottom:10px;opacity:.25}
+
+        .toast{
+            position:fixed;top:96px;left:50%;
+            transform:translateX(-50%) translateY(-16px);
+            background:rgba(30,30,30,.88);color:#fff;
+            padding:12px 28px;border-radius:14px;font-size:18px;font-weight:700;
+            z-index:1000;opacity:0;transition:all .28s ease;
+            pointer-events:none;white-space:nowrap;backdrop-filter:blur(8px);
+        }
+        .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+        .overlay{
+            position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:999;
+            display:none;align-items:center;justify-content:center;padding:24px;
+        }
+        .overlay.show{display:flex}
+        .dialog{
+            background:var(--card);border-radius:20px;padding:30px 24px 22px;
+            width:100%;max-width:320px;text-align:center;
+            box-shadow:0 12px 40px rgba(0,0,0,.18);
+        }
+        .dialog p{font-size:19px;font-weight:700;margin-bottom:26px;line-height:1.5}
+        .dialog-btns{display:flex;gap:12px}
+        .dialog-btns button{
+            flex:1;height:52px;border:none;border-radius:14px;font-size:18px;font-weight:700;
+            cursor:pointer;transition:transform .12s;
+        }
+        .dialog-btns button:active{transform:scale(.96)}
+        .d-cancel{background:#F0EEEA;color:var(--text)}
+        .d-ok{background:var(--danger);color:#fff}
+
+        @media(prefers-reduced-motion:reduce){
+            *,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}
+        }
+        @media(max-width:360px){
+            .stat-value{font-size:34px}
+            .input-group input{font-size:28px;height:60px}
+            .btn-record{font-size:22px;height:56px}
+            .history-bp{font-size:22px}
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>血压记录</h1>
+        <p>每天早晚各量一次，准时记录</p>
+    </header>
+
+    <main>
+        <section class="stats-card" aria-label="最近一月平均血压">
+            <div class="stat-item">
+                <div class="stat-label">最近一月<br>收缩压（高压）</div>
+                <div class="stat-value" id="avgSys">--</div>
+                <div class="stat-unit">mmHg</div>
+            </div>
+            <div class="stat-divider"></div>
+            <div class="stat-item">
+                <div class="stat-label">最近一月<br>舒张压（低压）</div>
+                <div class="stat-value" id="avgDia">--</div>
+                <div class="stat-unit">mmHg</div>
+            </div>
+        </section>
+
+        <section class="input-card" aria-label="记录血压">
+            <h2><i class="fas fa-pen-to-square"></i> 记录血压</h2>
+            <div class="input-row">
+                <div class="input-group">
+                    <label for="sysInput">收缩压（高压）</label>
+                    <input type="number" id="sysInput" inputmode="numeric" placeholder="120" min="60" max="260">
+                </div>
+                <div class="input-group">
+                    <label for="diaInput">舒张压（低压）</label>
+                    <input type="number" id="diaInput" inputmode="numeric" placeholder="80" min="30" max="160">
+                </div>
+            </div>
+            <button class="btn-record" id="btnRecord">
+                <i class="fas fa-check"></i> 记 录
+            </button>
+        </section>
+
+        <div class="alert-high" id="alertHigh" role="alert">
+            <i class="fas fa-triangle-exclamation" style="font-size:24px;flex-shrink:0"></i>
+            <span>血压高！请注意休息，必要时及时就医</span>
+        </div>
+
+        <section class="chart-card" aria-label="血压趋势图">
+            <h2><i class="fas fa-chart-line"></i> 血压趋势</h2>
+            <div class="chart-wrap" id="chartWrap">
+                <div class="chart-empty" id="chartEmpty">
+                    <i class="fas fa-chart-area"></i>
+                    记录两条以上数据后显示趋势图
+                </div>
+                <canvas id="bpChart" style="display:none"></canvas>
+            </div>
+        </section>
+
+        <section class="history-card" aria-label="历史记录">
+            <div class="history-header">
+                <h2><i class="fas fa-clock-rotate-left"></i> 历史记录</h2>
+                <button class="btn-clear" id="btnClear">清除全部</button>
+            </div>
+            <div class="history-list" id="historyList">
+                <div class="history-empty" id="historyEmpty">
+                    <i class="fas fa-inbox"></i>
+                    暂无记录
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <div class="toast" id="toast"></div>
+
+    <div class="overlay" id="overlay">
+        <div class="dialog">
+            <p id="dialogMsg"></p>
+            <div class="dialog-btns">
+                <button class="d-cancel" id="dCancel">取消</button>
+                <button class="d-ok" id="dOk">确定</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    (function() {
+        'use strict';
+
+        var STORE_KEY = 'bp_records_v1';
+        var memoryStore = [];
+        var storageOK = false;
+
+        var $sysInput     = document.getElementById('sysInput');
+        var $diaInput     = document.getElementById('diaInput');
+        var $btnRecord    = document.getElementById('btnRecord');
+        var $alertHigh    = document.getElementById('alertHigh');
+        var $avgSys       = document.getElementById('avgSys');
+        var $avgDia       = document.getElementById('avgDia');
+        var $chartEmpty   = document.getElementById('chartEmpty');
+        var $canvas       = document.getElementById('bpChart');
+        var $historyList  = document.getElementById('historyList');
+        var $historyEmpty = document.getElementById('historyEmpty');
+        var $btnClear     = document.getElementById('btnClear');
+        var $toast        = document.getElementById('toast');
+        var $overlay      = document.getElementById('overlay');
+        var $dialogMsg    = document.getElementById('dialogMsg');
+        var $dCancel      = document.getElementById('dCancel');
+        var $dOk          = document.getElementById('dOk');
+
+        var chart = null, alertTimer = null, toastTimer = null, dialogCb = null;
+
+        // 检测 localStorage
+        try {
+            var tk = '__bp_t__';
+            localStorage.setItem(tk, '1');
+            localStorage.removeItem(tk);
+            storageOK = true;
+        } catch(e) { storageOK = false; }
+
+        function loadRecords() {
+            if (memoryStore.length > 0) return memoryStore.slice();
+            if (!storageOK) return [];
+            try {
+                var d = JSON.parse(localStorage.getItem(STORE_KEY));
+                if (d && Array.isArray(d) && d.length > 0) { memoryStore = d.slice(); return memoryStore; }
+            } catch(e) {}
+            return [];
+        }
+
+        function saveRecords(records) {
+            memoryStore = records.slice();
+            if (!storageOK) return;
+            try { localStorage.setItem(STORE_KEY, JSON.stringify(records)); }
+            catch(e) { storageOK = false; }
+        }
+
+        function addRecord(sys, dia) {
+            var now = new Date();
+            var r = { id: now.getTime() + Math.random(), sys: sys, dia: dia, time: fmtDT(now), ts: now.getTime() };
+            var list = loadRecords(); list.push(r); saveRecords(list);
+            return r;
+        }
+
+        function removeRecord(id) { saveRecords(loadRecords().filter(function(r) { return r.id !== id; })); }
+
+        function clearAll() {
+            memoryStore = [];
+            if (storageOK) { try { localStorage.removeItem(STORE_KEY); } catch(e) {} }
+        }
+
+        function fmtDT(d) {
+            return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')
+                +' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+        }
+        function fmtShort(s) { var p=s.split(' '),dp=p[0].split('-'); return parseInt(dp[1])+'/'+parseInt(dp[2])+' '+p[1]; }
+        function fmtDate(s) { var dp=s.split(' ')[0].split('-'); return parseInt(dp[1])+'月'+parseInt(dp[2])+'日'; }
+        function fmtTime(s) { return s.split(' ')[1]; }
+        function getPeriod(s) { var h=parseInt(s.split(' ')[1].split(':')[0]); return (h>=6&&h<12)?'早':'晚'; }
+        function isHigh(s,d) { return s>135||d>85; }
+
+        function showToast(msg, ms) {
+            ms=ms||2000; $toast.textContent=msg; $toast.classList.add('show');
+            clearTimeout(toastTimer); toastTimer=setTimeout(function(){ $toast.classList.remove('show'); },ms);
+        }
+
+        function showDialog(msg,cb) { $dialogMsg.textContent=msg; dialogCb=cb; $overlay.classList.add('show'); }
+        function hideDialog() { $overlay.classList.remove('show'); dialogCb=null; }
+        $dCancel.onclick=hideDialog;
+        $dOk.onclick=function(){ if(dialogCb)dialogCb(); hideDialog(); };
+        $overlay.onclick=function(e){ if(e.target===$overlay)hideDialog(); };
+
+        function refreshAvg() {
+            try {
+                var now=Date.now(), ma=now-30*86400000;
+                var list=loadRecords().filter(function(r){return r.ts>=ma;});
+                if(!list.length){ $avgSys.textContent='--'; $avgDia.textContent='--'; $avgSys.style.color=$avgDia.style.color='var(--primary)'; return; }
+                var ss=0,sd=0; for(var i=0;i<list.length;i++){ss+=list[i].sys;sd+=list[i].dia;}
+                var aS=Math.round(ss/list.length), aD=Math.round(sd/list.length);
+                $avgSys.textContent=aS; $avgDia.textContent=aD;
+                $avgSys.style.color=aS>135?'var(--danger)':'var(--primary)';
+                $avgDia.style.color=aD>85?'var(--danger)':'var(--primary)';
+            } catch(e){}
+        }
+
+        function refreshChart() {
+            try {
+                if(typeof Chart==='undefined'){
+                    $chartEmpty.style.display='block';
+                    $chartEmpty.innerHTML='<i class="fas fa-chart-area"></i>图表组件加载中，请刷新重试';
+                    $canvas.style.display='none'; if(chart){chart.destroy();chart=null;} return;
+                }
+                var now=Date.now(),ma=now-30*86400000;
+                var list=loadRecords().filter(function(r){return r.ts>=ma;}).sort(function(a,b){return a.ts-b.ts;});
+                if(list.length<2){
+                    $chartEmpty.style.display='block';
+                    $chartEmpty.innerHTML='<i class="fas fa-chart-area"></i>记录两条以上数据后显示趋势图';
+                    $canvas.style.display='none'; if(chart){chart.destroy();chart=null;} return;
+                }
+                $chartEmpty.style.display='none'; $canvas.style.display='block';
+                var labels=list.map(function(r){return fmtShort(r.time);});
+                var sysD=list.map(function(r){return r.sys;}), diaD=list.map(function(r){return r.dia;});
+                var r135=new Array(labels.length).fill(135), r85=new Array(labels.length).fill(85);
+                if(chart){chart.destroy();chart=null;}
+                chart=new Chart($canvas.getContext('2d'),{
+                    type:'line',
+                    data:{
+                        labels:labels,
+                        datasets:[
+                            {label:'收缩压（高压）',data:sysD,borderColor:'#D94F3B',backgroundColor:'rgba(217,79,59,0.08)',borderWidth:2.5,pointRadius:4,pointHoverRadius:6,pointBackgroundColor:'#D94F3B',pointBorderWidth:0,tension:.3,fill:false},
+                            {label:'舒张压（低压）',data:diaD,borderColor:'#2E7D52',backgroundColor:'rgba(46,125,82,0.08)',borderWidth:2.5,pointRadius:4,pointHoverRadius:6,pointBackgroundColor:'#2E7D52',pointBorderWidth:0,tension:.3,fill:false},
+                            {label:'高压警戒线(135)',data:r135,borderColor:'rgba(217,79,59,0.3)',borderWidth:1.5,borderDash:[6,4],pointRadius:0,fill:false},
+                            {label:'低压警戒线(85)',data:r85,borderColor:'rgba(232,146,58,0.3)',borderWidth:1.5,borderDash:[6,4],pointRadius:0,fill:false}
+                        ]
+                    },
+                    options:{
+                        responsive:true,maintainAspectRatio:false,
+                        interaction:{intersect:false,mode:'index'},
+                        plugins:{
+                            legend:{position:'bottom',labels:{font:{size:11,weight:'bold'},boxWidth:14,padding:8,usePointStyle:true}},
+                            tooltip:{backgroundColor:'rgba(30,30,30,0.88)',titleFont:{size:12},bodyFont:{size:14,weight:'bold'},padding:10,cornerRadius:10,filter:function(i){return i.datasetIndex<2;},callbacks:{label:function(c){return c.dataset.label+': '+c.parsed.y+' mmHg';}}}
+                        },
+                        scales:{
+                            x:{ticks:{font:{size:10},maxRotation:50,maxTicksLimit:8},grid:{display:false}},
+                            y:{min:40,suggestedMax:200,ticks:{font:{size:11},stepSize:40},grid:{color:'rgba(0,0,0,0.04)'}}
+                        }
+                    }
+                });
+            } catch(e){
+                $chartEmpty.style.display='block';
+                $chartEmpty.innerHTML='<i class="fas fa-chart-area"></i>图表加载失败，不影响记录';
+                $canvas.style.display='none';
+            }
+        }
+
+        function refreshHistory() {
+            try {
+                var list=loadRecords().sort(function(a,b){return b.ts-a.ts;});
+                var old=$historyList.querySelectorAll('.history-item');
+                for(var k=0;k<old.length;k++) old[k].remove();
+                if(!list.length){$historyEmpty.style.display='block';return;}
+                $historyEmpty.style.display='none';
+                var show=list.slice(0,60);
+                for(var i=0;i<show.length;i++){
+                    var r=show[i], hi=isHigh(r.sys,r.dia), pd=getPeriod(r.time);
+                    var div=document.createElement('div');
+                    div.className='history-item';
+                    div.innerHTML='<div class="history-time"><div class="hd">'+fmtDate(r.time)+'</div><div>'+pd+' '+fmtTime(r.time)+'</div></div>'
+                        +'<div class="history-bp'+(hi?' high':'')+'">'+r.sys+'<span class="sep">/</span>'+r.dia+'<span class="unit">mmHg</span></div>'
+                        +'<span class="history-tag '+(hi?'high':'normal')+'">'+(hi?'偏高':'正常')+'</span>'
+                        +'<button class="btn-del" aria-label="删除" data-id="'+r.id+'"><i class="fas fa-trash-can"></i></button>';
+                    $historyList.appendChild(div);
+                }
+                var btns=$historyList.querySelectorAll('.btn-del');
+                for(var j=0;j<btns.length;j++){
+                    btns[j].onclick=function(e){
+                        e.stopPropagation();
+                        removeRecord(parseFloat(this.getAttribute('data-id')));
+                        refreshAll(); showToast('已删除');
+                    };
+                }
+            } catch(e){}
+        }
+
+        function refreshAll() { refreshAvg(); refreshChart(); refreshHistory(); }
+
+        $btnRecord.onclick=function(){
+            try {
+                var sv=$sysInput.value.trim(), dv=$diaInput.value.trim();
+                if(!sv||!dv){showToast('请输入高压和低压');return;}
+                var sys=parseInt(sv),dia=parseInt(dv);
+                if(isNaN(sys)||isNaN(dia)){showToast('请输入正确的数字');return;}
+                if(sys<60||sys>260){showToast('高压应在60到260之间');return;}
+                if(dia<30||dia>160){showToast('低压应在30到160之间');return;}
+                if(dia>=sys){showToast('低压应小于高压');return;}
+                addRecord(sys,dia);
+                if(isHigh(sys,dia)){
+                    $alertHigh.classList.remove('show'); void $alertHigh.offsetWidth;
+                    $alertHigh.classList.add('show'); clearTimeout(alertTimer);
+                    alertTimer=setTimeout(function(){$alertHigh.classList.remove('show');},6000);
+                } else {
+                    $alertHigh.classList.remove('show'); showToast('记录成功');
+                }
+                $sysInput.value=''; $diaInput.value=''; $sysInput.focus();
+                refreshAll();
+            } catch(e){ showToast('记录出错，请重试'); }
+        };
+
+        $diaInput.onkeydown=function(e){ if(e.key==='Enter'){e.preventDefault();$btnRecord.click();} };
+        $sysInput.onkeydown=function(e){ if(e.key==='Enter'){e.preventDefault();$diaInput.focus();} };
+
+        $btnClear.onclick=function(){
+            if(!loadRecords().length){showToast('暂无记录');return;}
+            showDialog('确定要清除全部记录吗？此操作不可撤销。',function(){
+                clearAll(); refreshAll(); showToast('已清除全部记录');
+            });
+        };
+
+        refreshAll();
+    })();
+    </script>
+</body>
+</html>
